@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Virtualización: una máquina, muchos sistemas</title>
+<meta name="description" content="Qué es la virtualización, cómo funcionan los hipervisores y los contenedores, y cuándo usar cada uno.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDF0F3; --ink:#16212C; --muted:#4F5E6C; --line:#C5CED7;
+  --hw:#3B4A59; --hyp:#2F6F73; --os:#8C5A3C; --eng:#2F6F73; --lib:#C98B2B; --app:#16212C;
+  --panel:#FFFFFF;
+  --head:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{--paper:#111A22; --ink:#E8EDF1; --muted:#9FB0BF; --line:#2C3A47; --panel:#18232D; --app:#E8EDF1}
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 1.0625rem/1.65 var(--body)}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--lib);outline-offset:3px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 1.25rem}
+h1,h2,h3{font-family:var(--head);line-height:1.08;margin:0;letter-spacing:-.02em}
+h1{font-size:clamp(2.5rem,6.5vw,4.6rem);font-weight:700}
+h2{font-size:clamp(1.8rem,3.6vw,2.5rem);font-weight:700;margin-bottom:.75rem}
+h3{font-size:1.25rem;font-weight:700;margin-bottom:.4rem;letter-spacing:-.01em}
+p{margin:0 0 1rem;max-width:62ch}
+nav{display:flex;gap:1.5rem;flex-wrap:wrap;padding:1.25rem 0;font-weight:600;font-size:.95rem}
+nav b{font-family:var(--head);font-size:1.1rem;margin-right:auto}
+nav a{text-decoration:none;color:var(--muted)}
+nav a:hover{color:var(--ink);text-decoration:underline}
+
+.hero{display:grid;grid-template-columns:1fr 1.05fr;gap:3rem;align-items:center;padding:3rem 0 4.5rem}
+.hero p{color:var(--muted);font-size:1.15rem;margin-top:1.25rem}
+.stack{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1.25rem}
+.toggle{display:flex;gap:.5rem;margin-bottom:1rem}
+.toggle button{flex:1;font:600 .95rem var(--body);padding:.65rem .5rem;border:1.5px solid var(--ink);background:transparent;color:var(--ink);border-radius:4px;cursor:pointer;transition:background .15s,color .15s}
+.toggle button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.layers{display:flex;flex-direction:column;gap:6px;min-height:15.5rem;justify-content:flex-end}
+.layer{border-radius:3px;color:#fff;padding:.55rem .75rem;font-size:.9rem;font-weight:600;text-align:center}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.col{display:flex;flex-direction:column;gap:6px}
+.col .layer{font-size:.82rem;padding:.5rem .3rem}
+.hw{background:var(--hw)} .hyp{background:var(--hyp)} .os{background:var(--os)} .lib{background:var(--lib);color:#16212C}
+.app{background:var(--app);color:var(--paper)}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-top:1rem;font-size:.88rem;color:var(--muted)}
+.facts strong{display:block;color:var(--ink);font-family:var(--head);font-size:1.05rem}
+
+section{padding:3.5rem 0;border-top:1px solid var(--line)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:2.5rem}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1.4rem}
+.card p{margin:0;color:var(--muted);font-size:1rem}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.5rem}
+.tablebox{overflow-x:auto;margin-top:1.5rem;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:.98rem}
+th,td{text-align:left;padding:.8rem 1rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--head);font-weight:700}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600}
+dl{margin:1.5rem 0 0;display:grid;grid-template-columns:max-content 1fr;gap:.9rem 1.5rem}
+dt{font-family:var(--head);font-weight:700}
+dd{margin:0;color:var(--muted)}
+pre{background:#16212C;color:#E8EDF1;padding:1.1rem 1.25rem;border-radius:6px;overflow-x:auto;font:.92rem/1.6 ui-monospace,Menlo,Consolas,monospace;margin:1.25rem 0 0}
+footer{padding:2.5rem 0 3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.95rem}
+
+@media (max-width:820px){
+  .hero,.two{grid-template-columns:1fr}
+  .three{grid-template-columns:1fr}
+  .hero{padding-top:1.5rem}
+  dl{grid-template-columns:1fr;gap:.2rem}
+  dd{margin-bottom:.8rem}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav aria-label="Principal">
+    <b>Virtualización</b>
+    <a href="#que-es">Qué es</a>
+    <a href="#tipos">Tipos</a>
+    <a href="#comparativa">VM o contenedor</a>
+    <a href="#herramientas">Herramientas</a>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <h1>Un servidor, muchos sistemas.</h1>
+      <p>La virtualización reparte los recursos de una máquina física entre varios entornos aislados. Pulsa los botones y mira cómo cambian las capas según uses máquinas virtuales o contenedores.</p>
+    </div>
+    <div class="stack" aria-live="polite">
+      <div class="toggle" role="group" aria-label="Tipo de virtualización">
+        <button type="button" data-mode="vm" aria-pressed="true">Máquinas virtuales</button>
+        <button type="button" data-mode="ct" aria-pressed="false">Contenedores</button>
+      </div>
+      <div class="layers" id="layers"></div>
+      <div class="facts" id="facts"></div>
+    </div>
+  </header>
+</div>
+
+<main>
+<section id="que-es"><div class="wrap">
+  <h2>Qué es la virtualización</h2>
+  <p>Consiste en crear una versión virtual de un recurso: un servidor, un sistema operativo, una red o un almacenamiento. En vez de dedicar un equipo físico a cada servicio, un solo equipo ejecuta varios entornos independientes que no se ven entre sí.</p>
+  <div class="three">
+    <div class="card"><h3>Aprovecha el hardware</h3><p>Un servidor que antes funcionaba al 15 % de su capacidad puede alojar varias cargas a la vez.</p></div>
+    <div class="card"><h3>Aísla los servicios</h3><p>Si un entorno falla o se ve comprometido, los demás siguen funcionando.</p></div>
+    <div class="card"><h3>Se copia y se mueve</h3><p>Un entorno virtual es un conjunto de archivos: se clona, se respalda y se traslada de un servidor a otro.</p></div>
+  </div>
+</div></section>
+
+<section id="tipos"><div class="wrap">
+  <h2>Los dos modelos principales</h2>
+  <div class="two">
+    <div>
+      <h3>Hipervisor y máquinas virtuales</h3>
+      <p>El hipervisor es un software que reparte CPU, memoria y disco entre varias máquinas virtuales. Cada una lleva su propio sistema operativo completo, así que puedes ejecutar Linux y Windows en el mismo equipo.</p>
+      <dl>
+        <dt>Tipo 1</dt><dd>Se instala directamente sobre el hardware (KVM, VMware ESXi, Hyper-V). Es el que usan los centros de datos.</dd>
+        <dt>Tipo 2</dt><dd>Se ejecuta como una aplicación dentro de un sistema operativo (VirtualBox, VMware Workstation). Es el más cómodo para estudiar y probar.</dd>
+      </dl>
+    </div>
+    <div>
+      <h3>Contenedores</h3>
+      <p>Los contenedores comparten el núcleo del sistema operativo anfitrión y aíslan solo los procesos, las librerías y la configuración de cada aplicación. Por eso son pequeños y arrancan en segundos.</p>
+      <p>Docker empaqueta una aplicación y sus dependencias en una imagen que funciona igual en tu portátil y en un servidor en la nube. Esta misma web se despliega así.</p>
+    </div>
+  </div>
+</div></section>
+
+<section id="comparativa"><div class="wrap">
+  <h2>Cuándo usar cada uno</h2>
+  <p>No compiten: muchos proveedores ejecutan contenedores dentro de máquinas virtuales para sumar las ventajas de los dos.</p>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th></th><th>Máquina virtual</th><th>Contenedor</th></tr></thead>
+      <tbody>
+        <tr><td>Aislamiento</td><td>Fuerte: sistema operativo propio</td><td>Medio: comparte el núcleo del anfitrión</td></tr>
+        <tr><td>Tamaño</td><td>Gigabytes</td><td>Decenas o cientos de megabytes</td></tr>
+        <tr><td>Arranque</td><td>Decenas de segundos o minutos</td><td>Segundos o menos</td></tr>
+        <tr><td>Sistemas distintos</td><td>Sí: Windows, Linux, BSD en el mismo host</td><td>Solo el mismo núcleo que el anfitrión</td></tr>
+        <tr><td>Ideal para</td><td>Aplicaciones heredadas, seguridad estricta, varios sistemas operativos</td><td>Microservicios, despliegues rápidos, entornos idénticos</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div></section>
+
+<section id="herramientas"><div class="wrap">
+  <h2>Herramientas habituales</h2>
+  <dl>
+    <dt>VirtualBox</dt><dd>Hipervisor tipo 2, gratuito, multiplataforma. Perfecto para practicar en clase.</dd>
+    <dt>KVM</dt><dd>Virtualización integrada en el núcleo de Linux. Es la base de muchas nubes.</dd>
+    <dt>VMware vSphere</dt><dd>Plataforma empresarial con ESXi como hipervisor tipo 1.</dd>
+    <dt>Hyper-V</dt><dd>Hipervisor de Microsoft incluido en Windows Pro y Windows Server.</dd>
+    <dt>Docker</dt><dd>Construye y ejecuta contenedores a partir de un archivo Dockerfile.</dd>
+    <dt>Kubernetes</dt><dd>Orquesta cientos de contenedores repartidos en varios servidores.</dd>
+  </dl>
+  <p style="margin-top:2rem">Un contenedor se lanza con una sola orden:</p>
+  <pre><code>docker run -d -p 8080:80 nginx:alpine</code></pre>
+</div></section>
+</main>
+
+<footer><div class="wrap">Web estática servida con Nginx en un contenedor Docker y desplegada en Render como servicio PaaS.</div></footer>
+
+<script>
+(function(){
+  var L=document.getElementById('layers'), F=document.getElementById('facts');
+  function layer(c,t){return '<div class="layer '+c+'">'+t+'</div>'}
+  var modes={
+    vm:{
+      html:function(){
+        var col='<div class="col">'+layer('app','App')+layer('lib','Librerías')+layer('os','SO invitado')+'</div>';
+        return layer('hw','Hardware físico')+layer('hyp','Hipervisor')+'<div class="cols">'+col+col+col+'</div>';
+      },
+      facts:[['Gigabytes','por cada VM'],['Minutos','para arrancar'],['Total','aislamiento']]
+    },
+    ct:{
+      html:function(){
+        var col='<div class="col">'+layer('app','App')+layer('lib','Librerías')+'</div>';
+        return layer('hw','Hardware físico')+layer('os','SO anfitrión')+layer('hyp','Motor de contenedores (Docker)')+'<div class="cols">'+col+col+col+'</div>';
+      },
+      facts:[['Megabytes','por contenedor'],['Segundos','para arrancar'],['Procesos','aislados']]
+    }
+  };
+  function show(m){
+    L.innerHTML=modes[m].html();
+    F.innerHTML=modes[m].facts.map(function(f){return '<div><strong>'+f[0]+'</strong>'+f[1]+'</div>'}).join('');
+    document.querySelectorAll('.toggle button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.mode===m)});
+  }
+  document.querySelectorAll('.toggle button').forEach(function(b){b.addEventListener('click',function(){show(b.dataset.mode)})});
+  show('vm');
+})();
+</script>
+</body>
+</html>
